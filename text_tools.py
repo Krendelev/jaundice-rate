@@ -1,33 +1,60 @@
-import pymorphy2
+import os
+import pytest
 import string
+
+import anyio
+import pymorphy2
+
+from settings import TIMEOUT
+
+
+def get_dictionary(dirpath):
+    files = [f.path for f in os.scandir(dirpath) if f.is_file()]
+    words = []
+    for file in files:
+        with open(file) as fh:
+            for line in fh:
+                words.append(line.split()[0])
+    return words
 
 
 def _clean_word(word):
-    word = word.replace('«', '').replace('»', '').replace('…', '')
-    # FIXME какие еще знаки пунктуации часто встречаются ?
+    word = word.replace("«", "").replace("»", "").replace("…", "")
     word = word.strip(string.punctuation)
     return word
 
 
-def split_by_words(morph, text):
+async def split_by_words(morph, text):
     """Учитывает знаки пунктуации, регистр и словоформы, выкидывает предлоги."""
     words = []
-    for word in text.split():
-        cleaned_word = _clean_word(word)
-        normalized_word = morph.parse(cleaned_word)[0].normal_form
-        if len(normalized_word) > 2 or normalized_word == 'не':
-            words.append(normalized_word)
+    with anyio.fail_after(TIMEOUT):
+        for word in text.split():
+            cleaned_word = _clean_word(word)
+            normalized_word = morph.parse(cleaned_word)[0].normal_form
+            if len(normalized_word) > 2 or normalized_word == "не":
+                words.append(normalized_word)
+            await anyio.sleep(0)
     return words
 
 
-def test_split_by_words():
+@pytest.mark.asyncio
+async def test_split_by_words():
     # Экземпляры MorphAnalyzer занимают 10-15Мб RAM т.к. загружают в память много данных
     # Старайтесь организовать свой код так, чтоб создавать экземпляр MorphAnalyzer заранее и в единственном числе
     morph = pymorphy2.MorphAnalyzer()
 
-    assert split_by_words(morph, 'Во-первых, он хочет, чтобы') == ['во-первых', 'хотеть', 'чтобы']
+    assert await split_by_words(morph, "Во-первых, он хочет, чтобы") == [
+        "во-первых",
+        "хотеть",
+        "чтобы",
+    ]
 
-    assert split_by_words(morph, '«Удивительно, но это стало началом!»') == ['удивительно', 'это', 'стать', 'начало']
+    assert await split_by_words(morph, "«Удивительно, но это стало началом!»") == [
+        "удивительно",
+        "это",
+        "стать",
+        "начало",
+    ]
 
 
 def calculate_jaundice_rate(article_words, charged_words):
@@ -45,4 +72,10 @@ def calculate_jaundice_rate(article_words, charged_words):
 
 def test_calculate_jaundice_rate():
     assert -0.01 < calculate_jaundice_rate([], []) < 0.01
-    assert 33.0 < calculate_jaundice_rate(['все', 'аутсайдер', 'побег'], ['аутсайдер', 'банкротство']) < 34.0
+    assert (
+        33.0
+        < calculate_jaundice_rate(
+            ["все", "аутсайдер", "побег"], ["аутсайдер", "банкротство"]
+        )
+        < 34.0
+    )
