@@ -11,7 +11,10 @@ from text_tools import get_dictionary
 
 
 async def handle(request):
-    param_name = next(iter(request.query))
+    try:
+        param_name = next(iter(request.query))
+    except StopIteration:
+        pass
     urls = request.query[param_name].split(",")
 
     if len(urls) > URL_LIMIT:
@@ -22,7 +25,7 @@ async def handle(request):
 
     async with aiohttp.ClientSession() as session:
         ratings = []
-        analyse = partial(
+        article_processor = partial(
             process_article,
             session,
             request.app["morph"],
@@ -31,7 +34,7 @@ async def handle(request):
         )
         async with anyio.create_task_group() as tg:
             for url in urls:
-                tg.start_soon(analyse, url)
+                tg.start_soon(article_processor, url)
 
     return web.json_response(ratings)
 

@@ -3,16 +3,18 @@ import time
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
+from sys import modules
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
 import anyio
 import pymorphy2
+import pytest
 from aiohttp.client_exceptions import ClientError
 from bs4 import BeautifulSoup
 
 from adapters import SANITIZERS
-from settings import DICTIONARIES_DIR, SITE, TIMEOUT
+from settings import DICTIONARIES_DIR, SITE, TEST_ADDRESSES, TIMEOUT
 from text_tools import calculate_jaundice_rate, get_dictionary, split_by_words
 
 logger = logging.getLogger(__file__)
@@ -84,7 +86,7 @@ async def main():
     async with aiohttp.ClientSession() as session:
         articles = await parse_frontpage(session, SITE.URL)
         ratings = []
-        run_process = partial(
+        article_processor = partial(
             process_article,
             session,
             morph,
@@ -93,9 +95,26 @@ async def main():
         )
         async with anyio.create_task_group() as tg:
             for url in articles:
-                tg.start_soon(run_process, url)
+                tg.start_soon(article_processor, url)
 
-    print(ratings)
+    return ratings
+
+
+@pytest.mark.asyncio
+async def test_process_article(monkeypatch):
+
+    async def fake_parse_frontpage(session, url):
+        return TEST_ADDRESSES
+
+    monkeypatch.setattr(modules[__name__], "parse_frontpage", fake_parse_frontpage)
+
+    results = await main()
+    results = sorted(results, key=lambda result: result["url"])
+
+    assert results[0]["status"] == "TIMEOUT"
+    assert results[1]["status"] == "OK"
+    assert 1.05 < results[1]["score"] < 1.10
+    assert results[2]["status"] == "PARSING_ERROR"
 
 
 if __name__ == "__main__":
