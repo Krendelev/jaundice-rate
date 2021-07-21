@@ -10,18 +10,25 @@ from settings import DICTIONARIES_DIR, URL_LIMIT
 from text_tools import get_dictionary
 
 
-async def handle(request):
-    try:
-        param_name = next(iter(request.query))
-    except StopIteration:
-        pass
-    urls = request.query[param_name].split(",")
+def check_parameter(parameter):
+    if not parameter:
+        return "pass urls list in request"
 
-    if len(urls) > URL_LIMIT:
+    if len(parameter.split(",")) > URL_LIMIT:
+        return f"too many urls in request, should be {URL_LIMIT} or less"
+
+    return None
+
+
+async def handle(request):
+    parameter = request.query.get("urls")
+
+    if error := check_parameter(parameter):
         return web.json_response(
-            {"error": f"too many urls in request, should be {URL_LIMIT} or less"},
+            {"error": error},
             status=400,
         )
+    urls = parameter.split(",")
 
     async with aiohttp.ClientSession() as session:
         ratings = []
