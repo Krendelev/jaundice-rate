@@ -24,10 +24,8 @@ async def handle(request):
     parameter = request.query.get("urls")
 
     if error := check_parameter(parameter):
-        return web.json_response(
-            {"error": error},
-            status=400,
-        )
+        return web.json_response({"error": error}, status=400)
+        
     urls = parameter.split(",")
 
     async with aiohttp.ClientSession() as session:
