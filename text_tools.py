@@ -24,10 +24,10 @@ def _clean_word(word):
     return word
 
 
-async def split_by_words(morph, text):
+async def split_by_words(morph, text, timeout=TIMEOUT):
     """Учитывает знаки пунктуации, регистр и словоформы, выкидывает предлоги."""
     words = []
-    with anyio.fail_after(TIMEOUT):
+    with anyio.fail_after(timeout):
         for word in text.split():
             cleaned_word = _clean_word(word)
             normalized_word = morph.parse(cleaned_word)[0].normal_form

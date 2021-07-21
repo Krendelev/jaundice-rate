@@ -38,8 +38,8 @@ def timing(logger):
         logger.info(f"Анализ закончен за {elapsed:.2f} сек")
 
 
-async def fetch(session, url):
-    with anyio.fail_after(TIMEOUT):
+async def fetch(session, url, timeout=TIMEOUT):
+    with anyio.fail_after(timeout):
         async with session.get(url) as response:
             response.raise_for_status()
             return await response.text()
@@ -102,7 +102,6 @@ async def main():
 
 @pytest.mark.asyncio
 async def test_process_article(monkeypatch):
-
     async def fake_parse_frontpage(session, url):
         return TEST_ADDRESSES
 
